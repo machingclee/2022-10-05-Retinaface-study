@@ -126,19 +126,19 @@ def encode_landm(landmarks, flattened_anchors):
 
     # dist b/t match center and prior's center
     landmarks = torch.reshape(landmarks, (landmarks.size(0), 5, 2))
-    priors_cx = flattened_anchors[:, 0].unsqueeze(1).expand(landmarks.size(0), 5).unsqueeze(2)
-    priors_cy = flattened_anchors[:, 1].unsqueeze(1).expand(landmarks.size(0), 5).unsqueeze(2)
-    priors_w = flattened_anchors[:, 2].unsqueeze(1).expand(landmarks.size(0), 5).unsqueeze(2)
-    priors_h = flattened_anchors[:, 3].unsqueeze(1).expand(landmarks.size(0), 5).unsqueeze(2)
-    flattened_anchors = torch.cat([priors_cx, priors_cy, priors_w, priors_h], dim=2)
-    g_cxcy = landmarks[:, :, :2] - flattened_anchors[:, :, :2]
+    priors_xmin = flattened_anchors[:, 0].unsqueeze(1).expand(landmarks.size(0), 5).unsqueeze(2)
+    priors_ymin = flattened_anchors[:, 1].unsqueeze(1).expand(landmarks.size(0), 5).unsqueeze(2)
+    priors_xmax = flattened_anchors[:, 2].unsqueeze(1).expand(landmarks.size(0), 5).unsqueeze(2)
+    priors_ymax = flattened_anchors[:, 3].unsqueeze(1).expand(landmarks.size(0), 5).unsqueeze(2)
+    flattened_anchors = torch.cat([priors_xmin, priors_ymin, priors_xmax, priors_ymax], dim=2)
+    xy_shift = landmarks[:, :, :2] - flattened_anchors[:, :, :2]
     # encode variance
-    g_cxcy /= flattened_anchors[:, :, 2:] - (flattened_anchors[:, :, :2])
-    # g_cxcy /= priors[:, :, 2:]
+    width_height = flattened_anchors[:, :, 2:] - (flattened_anchors[:, :, :2])
+    rel_shift /= width_height
     # result is the relative shift (in [0, 0.5]) from the center of an anchor
-    g_cxcy = g_cxcy.reshape(g_cxcy.size(0), -1)
+    rel_shift = xy_shift.reshape(xy_shift.size(0), -1)
     # return target for smooth_l1_loss
-    return g_cxcy
+    return rel_shift
 
 
 def decode_landm(pre, anchors):

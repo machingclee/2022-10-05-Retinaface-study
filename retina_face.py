@@ -8,7 +8,7 @@ from einops import rearrange, reduce, repeat
 from feature_extractor import Resnet50FPNFeactureExtractor
 from ssh import SSH
 from anchor_generator import AnchorGenerator
-from box_utils import assign_targets_to_anchors_or_proposals, decode_deltas_to_boxes, clip_boxes_to_image, encode_boxes_to_deltas, encode_landm
+from box_utils import assign_targets_to_anchors_or_proposals, decode_deltas_to_boxes, clip_boxes_to_image, encode_boxes_to_deltas, encode_landm, remove_small_boxes, decode_landm
 from device import device
 from utils import smooth_l1_loss
 
@@ -19,7 +19,7 @@ class ClassHead(nn.Module):
     def __init__(self, inchannels=512, num_anchors=2):
         super(ClassHead, self).__init__()
         self.num_anchors = num_anchors
-        self.conv1x1 = nn.Conv2d(inchannels, self.num_anchors * 2, kernel_size=(1, 1), stride=1, padding=0)
+        self.conv1x1 = nn.Conv2d(inchannels, self.num_anchors * 2, kernel_size=(1, 1), stride=1, padding=0).to(device)
 
     def forward(self, x):
         out = self.conv1x1(x)
@@ -30,7 +30,7 @@ class ClassHead(nn.Module):
 class BboxHead(nn.Module):
     def __init__(self, inchannels=512, num_anchors=2):
         super(BboxHead, self).__init__()
-        self.conv1x1 = nn.Conv2d(inchannels, num_anchors * 4, kernel_size=(1, 1), stride=1, padding=0)
+        self.conv1x1 = nn.Conv2d(inchannels, num_anchors * 4, kernel_size=(1, 1), stride=1, padding=0).to(device)
 
     def forward(self, x):
         out = self.conv1x1(x)
@@ -42,7 +42,7 @@ class BboxHead(nn.Module):
 class LandmarkHead(nn.Module):
     def __init__(self, inchannels=512, num_anchors=2):
         super(LandmarkHead, self).__init__()
-        self.conv1x1 = nn.Conv2d(inchannels, num_anchors * 10, kernel_size=(1, 1), stride=1, padding=0)
+        self.conv1x1 = nn.Conv2d(inchannels, num_anchors * 10, kernel_size=(1, 1), stride=1, padding=0).to(device)
 
     def forward(self, x):
         out = self.conv1x1(x)
@@ -112,6 +112,8 @@ class RetinaFace(nn.Module):
         flattend_labels = flattend_labels.to(device)
         pos_mask = flattend_labels == 1
         keep_mask = torch.abs(flattend_labels) == 1
+        pos_landmark_mask = flattened_multi_scale_distributed_landmarks[:, 0] > -1
+        keep_landmark_mask = keep_mask * pos_landmark_mask
 
         target_deltas = encode_boxes_to_deltas(flattended_distributed_targets, self.flattened_multi_scale_anchors)
         target_landmarks = encode_landm(flattened_multi_scale_distributed_landmarks, self.flattened_multi_scale_anchors)
@@ -120,7 +122,7 @@ class RetinaFace(nn.Module):
 
         if torch.sum(pos_mask) > 0:
             rpn_reg_loss = smooth_l1_loss(flattened_pred_deltas[pos_mask], target_deltas[pos_mask])
-            rpn_landm_reg_loss = smooth_l1_loss(flattened_landm_predictions[pos_mask], target_landmarks[pos_mask])
+            rpn_landm_reg_loss = smooth_l1_loss(flattened_landm_predictions[keep_landmark_mask], target_landmarks[keep_landmark_mask])
         else:
             rpn_reg_loss = torch.sum(flattened_pred_deltas) * 0
 
@@ -128,11 +130,25 @@ class RetinaFace(nn.Module):
 
         return rpn_cls_loss, rpn_reg_loss, rpn_landm_reg_loss
 
-    def get_cls_losses(self):
-        pass
+    def filter_boxes_by_scores_and_size(self, cls_logits, pred_boxes, landmarks):
+        # by architecture will also detect a box for "background" class, we eliminate it by slicing that out:
+        scores = cls_logits.softmax(dim=1)[:, 1]
+        boxes = pred_boxes[:, 1:]
 
-    def get_landm_losses(self):
-        pass
+        boxes = boxes.reshape(-1, 4)
+        scores = scores.reshape(-1)
+
+        indxes = torch.where(torch.gt(scores, config.pred_score_thresh))[0]
+        boxes = boxes[indxes]
+        scores = scores[indxes]
+        landmarks = landmarks[indxes]
+
+        keep = remove_small_boxes(boxes, min_length=1)
+        boxes = boxes[keep]
+        scores = scores[keep]
+        landmarks = landmarks[keep]
+
+        return scores, boxes, landmarks
 
     def forward(self, inputs, target_boxes=None, target_landmarks=None):
         # FPN
@@ -146,7 +162,7 @@ class RetinaFace(nn.Module):
 
         bbox_regressions = []
         classification_logits = []
-        landdm_regressions = []
+        landm_regressions = []
 
         for i, feature in enumerate(features):
             bboxes = self.BboxHead[i](feature)
@@ -154,9 +170,8 @@ class RetinaFace(nn.Module):
             ldmarks = self.LandmarkHead[i](feature)
             bbox_regressions.append(bboxes)
             classification_logits.append(classes)
-            landdm_regressions.append(ldmarks)
+            landm_regressions.append(ldmarks)
 
-        if self.training:
             assert target_boxes is not None, "target_boxes should not be none in training"
 
             if target_boxes is not None:
@@ -166,25 +181,25 @@ class RetinaFace(nn.Module):
             pred_deltas = []
             pred_landms = []
 
-            for deltas, logits, landms in zip(bbox_regressions, classification_logits, landdm_regressions):
-                logits = logits.squeeze(0)
-                deltas = deltas.squeeze(0)
-                landms = landms.squeeze(0)
+        for deltas, logits, landms in zip(bbox_regressions, classification_logits, landm_regressions):
+            logits = logits.squeeze(0)
+            deltas = deltas.squeeze(0)
+            landms = landms.squeeze(0)
 
-                pred_fg_bg_logits.append(logits)
-                pred_deltas.append(deltas)
-                pred_landms.append(landms)
+            pred_fg_bg_logits.append(logits)
+            pred_deltas.append(deltas)
+            pred_landms.append(landms)
 
-            flattened_pred_fg_bg_logits = torch.cat(pred_fg_bg_logits, dim=0).to(device)
-            flattened_pred_deltas = torch.cat(pred_deltas, dim=0).to(device)
-            flattened_landm_predictions = torch.cat(pred_landms, dim=0).to(device)
+        # bbox: [1, 64512, 4], where 64512 = (128*128 + 64*64 + 32*32) * (n_anchors=3),
+        # similar holds for
+        # classifications: [1, 64512, 2]
+        # ldm_regressions: [1, 64512, 10] for 5 landmarks
 
-            rois = decode_deltas_to_boxes(
-                flattened_pred_deltas.detach().clone(),
-                self.flattened_multi_scale_anchors
-            )
-            rois = clip_boxes_to_image(rois)
-            rois = rois.squeeze(0)
+        flattened_pred_fg_bg_logits = torch.cat(pred_fg_bg_logits, dim=0).to(device)
+        flattened_pred_deltas = torch.cat(pred_deltas, dim=0).to(device)
+        flattened_landm_predictions = torch.cat(pred_landms, dim=0).to(device)
+
+        if self.training:
             rpn_cls_loss, rpn_reg_loss, rpn_landm_reg_loss = self.get_multibox_loss(
                 target_boxes,
                 target_landmarks,
@@ -195,15 +210,15 @@ class RetinaFace(nn.Module):
             return rpn_cls_loss, rpn_reg_loss, rpn_landm_reg_loss
 
         else:
-            # bbox: [1, 64512, 4], where 64512 = (128*128 + 64*64 + 32*32) * (n_anchors=3),
-            # similar holds for
-            # classifications: [1, 64512, 2]
-            # ldm_regressions: [1, 64512, 10] for 5 landmarks
-
-            bbox_regressions = torch.cat(bbox_regressions, dim=1)
-            classification_logits = torch.cat(classification_logits, dim=1)
-            landdm_regressions = torch.cat(landdm_regressions, dim=1)
-            return bbox_regressions, F.softmax(classification_logits, dim=-1), landdm_regressions
+            rois = decode_deltas_to_boxes(
+                flattened_pred_deltas.detach().clone(),
+                self.flattened_multi_scale_anchors
+            )
+            rois = clip_boxes_to_image(rois)
+            rois = rois.squeeze(0)
+            landmarks = decode_landm(flattened_landm_predictions, rois)
+            scores, boxes, landmarks = self.filter_boxes_by_scores_and_size(flattened_pred_fg_bg_logits, rois, landmarks)
+            return scores, boxes, landmarks
 
 
 if __name__ == "__main__":

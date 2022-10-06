@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision.models as models
 import torch.nn.functional as F
 from torchsummary import summary
-
+from device import device
 
 def conv_bn(inp, oup, stride=1, leaky=0):
     return nn.Sequential(
@@ -46,13 +46,13 @@ class SSH(nn.Module):
         leaky = 0
         if (out_channel <= 64):
             leaky = 0.1
-        self.conv3X3 = conv_bn_no_relu(in_channel, out_channel // 2, stride=1)
+        self.conv3X3 = conv_bn_no_relu(in_channel, out_channel // 2, stride=1).to(device)
 
-        self.conv5X5_1 = conv_bn(in_channel, out_channel // 4, stride=1, leaky=leaky)
-        self.conv5X5_2 = conv_bn_no_relu(out_channel // 4, out_channel // 4, stride=1)
+        self.conv5X5_1 = conv_bn(in_channel, out_channel // 4, stride=1, leaky=leaky).to(device)
+        self.conv5X5_2 = conv_bn_no_relu(out_channel // 4, out_channel // 4, stride=1).to(device)
 
-        self.conv7X7_2 = conv_bn(out_channel // 4, out_channel // 4, stride=1, leaky=leaky)
-        self.conv7x7_3 = conv_bn_no_relu(out_channel // 4, out_channel // 4, stride=1)
+        self.conv7X7_2 = conv_bn(out_channel // 4, out_channel // 4, stride=1, leaky=leaky).to(device)
+        self.conv7x7_3 = conv_bn_no_relu(out_channel // 4, out_channel // 4, stride=1).to(device)
 
     def forward(self, input):
         conv3X3 = self.conv3X3(input)

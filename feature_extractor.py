@@ -3,6 +3,7 @@ import torch.nn as nn
 import torchvision.models as models
 import torch.nn.functional as F
 import config
+from device import device
 from torchsummary import summary
 
 
@@ -10,7 +11,7 @@ class Resnet50FPNFeactureExtractor(nn.Module):
     def __init__(self):
         self.fpn_out_channels = config.fpn_out_channels
         super(Resnet50FPNFeactureExtractor, self).__init__()
-        self.resnet50 = models.resnet50(pretrained=True)
+        self.resnet50 = models.resnet50(pretrained=True).to(device)
 
         self.conv2 = nn.Sequential(
             self.resnet50.conv1,
@@ -23,9 +24,9 @@ class Resnet50FPNFeactureExtractor(nn.Module):
         self.conv4 = self.resnet50.layer3
         self.conv5 = self.resnet50.layer4
 
-        self.lateral_conv5 = nn.Conv2d(2048, config.fpn_out_channels, 1, 1)
-        self.lateral_conv4 = nn.Conv2d(1024, config.fpn_out_channels, 1, 1)
-        self.lateral_conv3 = nn.Conv2d(512, config.fpn_out_channels, 1, 1)
+        self.lateral_conv5 = nn.Conv2d(2048, config.fpn_out_channels, 1, 1).to(device)
+        self.lateral_conv4 = nn.Conv2d(1024, config.fpn_out_channels, 1, 1).to(device)
+        self.lateral_conv3 = nn.Conv2d(512, config.fpn_out_channels, 1, 1).to(device)
 
         self.upscale = lambda input: F.interpolate(input, scale_factor=2)
         self.freeze_params()
