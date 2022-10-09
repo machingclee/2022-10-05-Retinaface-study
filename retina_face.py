@@ -11,6 +11,7 @@ from anchor_generator import AnchorGenerator
 from box_utils import assign_targets_to_anchors_or_proposals, decode_deltas_to_boxes, clip_boxes_to_image, encode_boxes_to_deltas, encode_landm, remove_small_boxes, decode_landm
 from device import device
 from utils import smooth_l1_loss
+from torchvision.ops import nms
 
 cce_loss = nn.CrossEntropyLoss()
 
@@ -42,7 +43,13 @@ class BboxHead(nn.Module):
 class LandmarkHead(nn.Module):
     def __init__(self, inchannels=512, num_anchors=2):
         super(LandmarkHead, self).__init__()
-        self.conv1x1 = nn.Conv2d(inchannels, num_anchors * 10, kernel_size=(1, 1), stride=1, padding=0).to(device)
+        self.conv1x1 = nn.Conv2d(
+            inchannels,
+            num_anchors *
+            config.n_landmark_coordinates,
+            kernel_size=(1, 1),
+            stride=1,
+            padding=0).to(device)
 
     def forward(self, x):
         out = self.conv1x1(x)
@@ -112,7 +119,8 @@ class RetinaFace(nn.Module):
         flattend_labels = flattend_labels.to(device)
         pos_mask = flattend_labels == 1
         keep_mask = torch.abs(flattend_labels) == 1
-        pos_landmark_mask = flattened_multi_scale_distributed_landmarks[:, 0] > -1
+        # eliminate landmarks that only have 0 values (i.e., no landmarks)
+        pos_landmark_mask = torch.sum(flattened_multi_scale_distributed_landmarks[:], dim=-1) > 0
         keep_landmark_mask = keep_mask * pos_landmark_mask
 
         target_deltas = encode_boxes_to_deltas(flattended_distributed_targets, self.flattened_multi_scale_anchors)
@@ -133,15 +141,12 @@ class RetinaFace(nn.Module):
     def filter_boxes_by_scores_and_size(self, cls_logits, pred_boxes, landmarks):
         # by architecture will also detect a box for "background" class, we eliminate it by slicing that out:
         scores = cls_logits.softmax(dim=1)[:, 1]
-        boxes = pred_boxes[:, 1:]
-
-        boxes = boxes.reshape(-1, 4)
         scores = scores.reshape(-1)
 
-        indxes = torch.where(torch.gt(scores, config.pred_score_thresh))[0]
-        boxes = boxes[indxes]
-        scores = scores[indxes]
-        landmarks = landmarks[indxes]
+        idxes = scores > config.pred_score_thresh
+        boxes = pred_boxes[idxes]
+        scores = scores[idxes]
+        landmarks = landmarks[idxes]
 
         keep = remove_small_boxes(boxes, min_length=1)
         boxes = boxes[keep]
@@ -151,6 +156,10 @@ class RetinaFace(nn.Module):
         return scores, boxes, landmarks
 
     def forward(self, inputs, target_boxes=None, target_landmarks=None):
+        if self.training:
+            assert target_boxes is not None, "target_boxes should not be none in training"
+            target_boxes = target_boxes.to(device)
+
         # FPN
         fpn = self.backbone(inputs)
 
@@ -172,14 +181,9 @@ class RetinaFace(nn.Module):
             classification_logits.append(classes)
             landm_regressions.append(ldmarks)
 
-            assert target_boxes is not None, "target_boxes should not be none in training"
-
-            if target_boxes is not None:
-                target_boxes = target_boxes.to(device)
-
-            pred_fg_bg_logits = []
-            pred_deltas = []
-            pred_landms = []
+        pred_fg_bg_logits = []
+        pred_deltas = []
+        pred_landms = []
 
         for deltas, logits, landms in zip(bbox_regressions, classification_logits, landm_regressions):
             logits = logits.squeeze(0)
@@ -216,8 +220,12 @@ class RetinaFace(nn.Module):
             )
             rois = clip_boxes_to_image(rois)
             rois = rois.squeeze(0)
-            landmarks = decode_landm(flattened_landm_predictions, rois)
+            landmarks = decode_landm(flattened_landm_predictions, self.flattened_multi_scale_anchors)
             scores, boxes, landmarks = self.filter_boxes_by_scores_and_size(flattened_pred_fg_bg_logits, rois, landmarks)
+            keep = nms(boxes, scores, config.final_nms_iou)[0: config.rpn_n_sample]
+            scores = scores[keep]
+            boxes = boxes[keep]
+            landmarks = landmarks[keep]
             return scores, boxes, landmarks
 
 

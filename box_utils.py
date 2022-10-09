@@ -38,7 +38,7 @@ def assign_targets_to_anchors_or_proposals(
         labels = torch.zeros((len(anchors),), dtype=torch.int32).to(device)
         distributed_cls_indexes = torch.zeros((len(anchors),), dtype=torch.float32).to(device)
         distributed_targets = torch.zeros((len(anchors), 4), dtype=torch.float32).to(device)
-        distributed_target_landmarks = torch.zeros((len(anchors), 10), dtype=torch.float32).to(device)
+        distributed_target_landmarks = torch.zeros((len(anchors), config.n_landmark_coordinates), dtype=torch.float32).to(device)
 
         if len(target_boxes) == 0:
             chosen_idxes = random_choice(torch.arange(len(anchors)), n_sample)
@@ -52,6 +52,11 @@ def assign_targets_to_anchors_or_proposals(
         max_iou_anchor_index = torch.argmax(ious, dim=0)  # return k anchor indexes corresponding to k targets
         labels[max_iou_anchor_index] = 1
         distributed_targets[max_iou_anchor_index] = target_boxes
+        n_boxes = target_boxes.size()[0]
+
+        if target_landmarks.size()[0] == 0:
+            target_landmarks = torch.zeros((n_boxes, config.n_landmark_coordinates))
+
         distributed_target_landmarks[max_iou_anchor_index] = target_landmarks
 
         if target_cls_indexes is not None:
@@ -133,9 +138,9 @@ def encode_landm(landmarks, flattened_anchors):
     flattened_anchors = torch.cat([priors_xmin, priors_ymin, priors_xmax, priors_ymax], dim=2)
     xy_shift = landmarks[:, :, :2] - flattened_anchors[:, :, :2]
     # encode variance
-    width_height = flattened_anchors[:, :, 2:] - (flattened_anchors[:, :, :2])
-    rel_shift /= width_height
-    # result is the relative shift (in [0, 0.5]) from the center of an anchor
+    width_height = flattened_anchors[:, :, 2:] - flattened_anchors[:, :, :2]
+    rel_shift = xy_shift / (0.01 * width_height)
+    # result is the relative shift (in [0, 1]) from the upper left corner
     rel_shift = xy_shift.reshape(xy_shift.size(0), -1)
     # return target for smooth_l1_loss
     return rel_shift
@@ -153,11 +158,11 @@ def decode_landm(pre, anchors):
         decoded landm predictions
     """
     width_height = anchors[:, 2:] - anchors[:, :2]
-    landms = torch.cat((anchors[:, :2] + pre[:, :2] * width_height,
-                        anchors[:, :2] + pre[:, 2:4] * width_height,
-                        anchors[:, :2] + pre[:, 4:6] * width_height,
-                        anchors[:, :2] + pre[:, 6:8] * width_height,
-                        anchors[:, :2] + pre[:, 8:10] * width_height,
+    landms = torch.cat((anchors[:, :2] + pre[:, :2] * 0.01 * width_height,
+                        anchors[:, :2] + pre[:, 2:4] * 0.01 * width_height,
+                        anchors[:, :2] + pre[:, 4:6] * 0.01 * width_height,
+                        anchors[:, :2] + pre[:, 6:8] * 0.01 * width_height,
+                        anchors[:, :2] + pre[:, 8:10] * 0.01 * width_height,
                         ), dim=1)
     return landms
 
@@ -346,6 +351,6 @@ def clip_boxes_to_image(boxes, size=config.image_shape):
 
 def remove_small_boxes(boxes, min_length):
     ws, hs = boxes[:, 2] - boxes[:, 0], boxes[:, 3] - boxes[:, 1]
-    keep = torch.logical_and(torch.ge(ws, min_length), torch.ge(hs, min_length))
+    keep = (ws > min_length) * (hs > min_length)
     keep = torch.where(keep)[0]
     return keep
