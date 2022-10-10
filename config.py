@@ -1,4 +1,4 @@
-anchor_ratios = [0.5, 1, 2]
+anchor_ratios = [1]
 anchor_scales = [64, 256, 512]
 num_anchors = len(anchor_ratios) * len(anchor_scales)
 batch_size = 1
