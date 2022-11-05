@@ -4,16 +4,18 @@ import torchvision.models as models
 import torch.nn.functional as F
 import numpy as np
 import os
-import config
+import src.config as config
 from torchsummary import summary
 from PIL import Image, ImageDraw
 from typing import Tuple
 from data.wider_face import WiderFaceDetection
+from data.wflw import WFLWDatasets
 from torch.utils.data import Dataset, DataLoader
-from device import device
+from src.device import device
 from detect import detect, load_model
 from data import cfg_mnet, cfg_re50
-from models.retinaface import RetinaFace
+from src.models.retinaface import RetinaFace
+from data.data_augment import torch_imgnet_denormalization_to_pil
 
 
 def draw_box(pil_img: Image.Image, bboxes, confs=None, color=(255, 255, 255, 150)):
@@ -30,11 +32,11 @@ def draw_box(pil_img: Image.Image, bboxes, confs=None, color=(255, 255, 255, 150
             )
 
 
-def draw_dots(pil_img: Image.Image, pred_boxes, pred_landmarks: Tuple[float], r=2, constrain_pts=False):
+def draw_dots(pil_img: Image.Image, pred_boxes, pred_landmarks: Tuple[float], r=config.landm_dot_radius, constrain_pts=False):
     draw = ImageDraw.Draw(pil_img)
     for bbox, landmark in zip(pred_boxes, pred_landmarks):
         xmin, ymin, xmax, ymax = bbox
-        for x, y in np.array_split(landmark, 5):
+        for x, y in np.array_split(landmark, config.n_landmarks):
             if not constrain_pts:
                 draw.ellipse((x - r, y - r, x + r, y + r), fill=(255, 0, 0))
             else:
@@ -42,31 +44,37 @@ def draw_dots(pil_img: Image.Image, pred_boxes, pred_landmarks: Tuple[float], r=
                     draw.ellipse((x - r, y - r, x + r, y + r), fill=(255, 0, 0))
 
 
-def visualize_training_data(n_images: int):
-    training_data_loader = DataLoader(dataset=FacialLandmarkTrainingDataset(),
-                                      batch_size=1,
-                                      shuffle=True)
-    train_iter = iter(training_data_loader)
-    for i in range(n_images):
-        img, bboxes, landmarks, _ = next(train_iter)
-        bboxes = bboxes.squeeze(0)
-        landmarks = landmarks.squeeze(0)
-        pil_img = torch_img_denormalization(img)
-        draw_box(pil_img, bboxes, color=(0, 0, 255, 150))
-        draw_dots(pil_img, bboxes, landmarks)
-        pil_img.save("dataset_check/{}.jpg".format(str(i).zfill(3)))
+# def visualize_training_data(n_images: int):
+#     training_data_loader = DataLoader(dataset=FacialLandmarkTrainingDataset(),
+#                                       batch_size=1,
+#                                       shuffle=True)
+#     train_iter = iter(training_data_loader)
+#     for i in range(n_images):
+#         img, bboxes, landmarks, _ = next(train_iter)
+#         bboxes = bboxes.squeeze(0)
+#         landmarks = landmarks.squeeze(0)
+#         pil_img = torch_img_denormalization(img)
+#         draw_box(pil_img, bboxes, color=(0, 0, 255, 150))
+#         draw_dots(pil_img, bboxes, landmarks)
+#         pil_img.save("dataset_check/{}.jpg".format(str(i).zfill(3)))
 
 
 def visualize_model_on_validation_data(model: nn.Module, epoch=0, batch_id=0):
     model.eval()
-    val_data_loader = DataLoader(dataset=WiderFaceDetection(config.WIDER_VAL_LABEL_TXT, config.WIDER_VAL_IMG_DIR, mode="val"),
+    # val_data_loader = DataLoader(dataset=WiderFaceDetection(config.WIDER_VAL_LABEL_TXT, config.WIDER_VAL_IMG_DIR, mode="val"),
+    #                              batch_size=1,
+    #                              shuffle=True)
+    val_data_loader = DataLoader(dataset=WFLWDatasets(file_list=[config.WFLW_TRAIN_LABEL_TXT, config.WFLW_VAL_LABEL_TXT],
+                                                      img_dir=config.WFLW_TRAIN_IMG_DIR),
                                  batch_size=1,
                                  shuffle=True)
-    img, target_bboxes = next(iter(val_data_loader))
-    pred_img = img.clone().squeeze(0)
-    target_bboxes = target_bboxes.squeeze(0)[:, 0:4]
+    img, targets = next(iter(val_data_loader))
+    _, _, im_height, im_width = img.shape
+    scale = torch.Tensor([im_width, im_height] * 2).to(device)
+    pred_img = img.clone()
+    target_bboxes = targets.squeeze(0)[:, 196:-1] * scale[None]
     confs, pred_boxes, pred_landmarks = detect(model, pred_img)
-    pil_img = Image.fromarray(img.squeeze(0).clone().cpu().numpy())
+    pil_img = torch_imgnet_denormalization_to_pil(img)
 
     draw_box(pil_img, pred_boxes, color=(0, 0, 255, 150), confs=confs)
     draw_box(pil_img, target_bboxes, color=(0, 255, 0, 150))

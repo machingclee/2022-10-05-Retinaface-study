@@ -1,12 +1,28 @@
 from torchvision import transforms
-from torch.utils.data import DataLoader
 from torch.utils import data
 from PIL import Image, ImageFilter
-from data_augment import wflw_preproc
+from data.data_augment import wflw_preproc
+from pydash import get, set_
+from src import config
 import numpy as np
 import os
-import config
 import random
+import torch
+from src.device import device
+from data.data_augment import torch_imgnet_transform
+
+
+def collate_fn(batch):
+    imgs = []
+    batch_annotations = []
+
+    for i in range(len(batch)):
+        data = batch[i]
+        img, annotation = data
+        imgs.append(img.unsqueeze(0))
+        batch_annotations.append(annotation)
+
+    return torch.cat(imgs, dim=0).to(device), batch_annotations
 
 
 class wflm_attribute_enum:
@@ -46,42 +62,64 @@ def random_occlude(img, r=0.3, p=0.2):
 
 
 class WFLWDatasets(data.Dataset):
-    def __init__(self, file_list, img_dir):
-        self.line = None
+    def __init__(self,
+                 file_list=[config.WFLW_TRAIN_LABEL_TXT, config.WFLW_VAL_LABEL_TXT],
+                 img_dir=config.WFLW_TRAIN_IMG_DIR,
+                 preproc=wflw_preproc(img_dim=config.input_img_size)):
         self.path = None
         self.landmarks = None
         self.attribute = None
         self.loc_img_path = None
         self.bbox_xyxy = None
         self.transforms = transforms
-        self.preproc = wflw_preproc()
-
+        self.preproc = preproc
         self.img_dir = img_dir
-        with open(file_list, 'r') as f:
-            self.lines = f.readlines()
+        self.data = None
+
+        img_path_to_annotations = {}
+
+        def get_annotation(file_list):
+            with open(file_list, 'r') as f:
+
+                lines = f.readlines()
+                for line in lines:
+                    data = line.strip().split()
+
+                    rel_img_path = data[-1]
+                    landmarks = [float(v) for v in data[0: 196]]
+                    bbox = [float(v) for v in data[196:200]]
+
+                    anno = landmarks + bbox + [1]
+
+                    annotation = get(img_path_to_annotations, [rel_img_path])
+
+                    if annotation is None:
+                        set_(img_path_to_annotations, [rel_img_path], [anno])
+                    else:
+                        annotation.append(anno)
+
+        if isinstance(file_list, list):
+            for file in file_list:
+                get_annotation(file)
+        else:
+            get_annotation(file_list)
+
+        self.data = [(rel_img_path_, annotations_) for rel_img_path_, annotations_ in img_path_to_annotations.items()]
 
     def __getitem__(self, index):
-        self.line = self.lines[index].strip().split()
-        self.name = self.line[0]
-        self.loc_img_path = self.line[-1]
-        self.img = np.array(Image.open(os.path.join(self.img_dir, self.loc_img_path)))
-        # self.landmark = np.asarray(self.line[0:196], dtype=np.float32)
-        # self.attribute = np.asarray(self.line[200:206], dtype=np.float32)
-        # self.bbox_xyxy = np.asarray(self.line[197:201], dtype=np.int32)
-        target = np.array(self.line[0:-1], dtype=np.float32)
+        data = self.data[index]
+        rel_img_path, annotations = data
+        self.img = np.array(Image.open(os.path.join(self.img_dir, os.path.normpath(rel_img_path))))
+        target = np.array(annotations)
 
-        img, target = self.preproc(img, target)
-
-        return (self.img, self.landmark, self.attribute, self.bbox_xyxy)
+        img, target = self.preproc(self.img, target)
+        return img, target
 
     def __len__(self):
-        return len(self.lines)
+        return len(self.data)
 
 
 if __name__ == "__main__":
-    dataset = WFLWDatasets(
-        file_list=config.WFLW_TRAIN_LABEL_TXT,
-        img_dir=config.WFLW_TRAIN_IMG_DIR
-    )
+    dataset = WFLWDatasets()
     data = next(iter(dataset))
     print(data)

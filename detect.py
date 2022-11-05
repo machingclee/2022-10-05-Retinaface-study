@@ -4,32 +4,20 @@ import argparse
 import torch
 import torch.backends.cudnn as cudnn
 import numpy as np
+import src.config as config
+import cv2
+import time
+
 from data import cfg_mnet, cfg_re50
 from layers.functions.prior_box import PriorBox
 from utils.nms.py_cpu_nms import py_cpu_nms
-import cv2
-from models.retinaface import RetinaFace
+from src.models.retinaface import RetinaFace
 from utils.box_utils import decode, decode_landm
-import time
 from PIL import Image
 from torchvision.ops import nms
-from device import device
-import config
+from src.device import device
 from data import cfg_mnet, cfg_re50
-
-parser = argparse.ArgumentParser(description='Retinaface')
-
-parser.add_argument('-m', '--trained_model', default='./weights/Resnet50_Final.pth',
-                    type=str, help='Trained state_dict file path to open')
-parser.add_argument('--network', default='resnet50', help='Backbone network mobile0.25 or resnet50')
-parser.add_argument('--cpu', action="store_true", default=False, help='Use cpu inference')
-parser.add_argument('--confidence_threshold', default=0.02, type=float, help='confidence_threshold')
-parser.add_argument('--top_k', default=5000, type=int, help='top_k')
-parser.add_argument('--nms_threshold', default=0.4, type=float, help='nms_threshold')
-parser.add_argument('--keep_top_k', default=750, type=int, help='keep_top_k')
-parser.add_argument('-s', '--save_image', action="store_true", default=True, help='show detection results')
-parser.add_argument('--vis_thres', default=0.6, type=float, help='visualization_threshold')
-args = parser.parse_args()
+from arg_parser import get_args
 
 
 def check_keys(model, pretrained_state_dict):
@@ -69,13 +57,11 @@ def load_model(model, pretrained_path, load_to_cpu):
 
 
 def detect(model, img: torch.Tensor, cfg=cfg_re50):
-    im_height, im_width, _ = img.shape
+    _, _, im_height, im_width = img.shape
     scale = torch.Tensor([im_width, im_height, im_width, im_height])
-    img -= torch.as_tensor((104, 117, 123))
-    img = img.unsqueeze(0)
+    # img -= torch.as_tensor((104, 117, 123))
     img = img.to(device)
     scale = scale.to(device)
-    img = img.permute(0, 3, 1, 2).float()
     tic = time.time()
     loc, scores, landms = model(img)  # forward pass
     scores = scores.squeeze(0).softmax(-1)[:, 1]
@@ -88,11 +74,9 @@ def detect(model, img: torch.Tensor, cfg=cfg_re50):
     boxes = decode(loc.data.squeeze(0), prior_data, cfg['variance'])
     boxes = boxes * scale
     landms = decode_landm(landms.data.squeeze(0), prior_data, cfg['variance'])
-    scale1 = torch.Tensor([img.shape[3], img.shape[2], img.shape[3], img.shape[2],
-                           img.shape[3], img.shape[2], img.shape[3], img.shape[2],
-                           img.shape[3], img.shape[2]])
+    scale1 = torch.Tensor([img.shape[3], img.shape[2]] * config.n_landmarks)
     scale1 = scale1.to(device)
-    landms = landms * scale1
+    landms = landms * scale1[None]
     keep_ = nms(boxes, scores, config.final_nms_iou)[0: config.rpn_n_sample]
     keep = keep_[torch.where(scores[keep_] > config.pred_thres)[0]]
     boxes = boxes[keep]
@@ -103,6 +87,8 @@ def detect(model, img: torch.Tensor, cfg=cfg_re50):
 
 if __name__ == '__main__':
     torch.set_grad_enabled(False)
+
+    args = get_args()
     cfg = None
     if args.network == "mobile0.25":
         cfg = cfg_mnet

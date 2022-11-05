@@ -8,6 +8,8 @@ import numpy as np
 from typing import Optional
 from PIL import Image
 from data.data_augment import preproc
+from src import config
+from src.device import device
 
 
 class WiderFaceDetection(data.Dataset):
@@ -83,7 +85,7 @@ class WiderFaceDetection(data.Dataset):
         if self.preproc is not None:
             img, target = self.preproc(img, target)
 
-        return torch.from_numpy(img), target
+        return torch.from_numpy(img).to(device), torch.as_tensor(target).to(device)
 
 
 def detection_collate(batch):
@@ -112,8 +114,8 @@ def detection_collate(batch):
 
 
 if __name__ == "__main__":
-    label_txt_path = r"C:\Users\user\Repos\Python\Pytorch_Retinaface\data\wider_face\wider_face_annotation\train\label.txt"
-    img_dir = r"C:\Users\user\Repos\Python\Pytorch_Retinaface\data\wider_face\WIDER_train\images"
+    label_txt_path = config.WIDER_TRAIN_LABEL_TXT
+    img_dir = config.WIDER_TRAIN_IMG_DIR
     dataset = WiderFaceDetection(txt_path=label_txt_path, img_dir=img_dir)
     data = next(iter(dataset))
     print(data)

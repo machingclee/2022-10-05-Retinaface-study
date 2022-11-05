@@ -3,11 +3,13 @@ import torch.nn as nn
 import torchvision.models.detection.backbone_utils as backbone_utils
 import torchvision.models._utils as _utils
 import torch.nn.functional as F
+
 from collections import OrderedDict
 
-from models.net import MobileNetV1 as MobileNetV1
-from models.net import FPN as FPN
-from models.net import SSH as SSH
+from src.models.net import MobileNetV1 as MobileNetV1
+from src.models.net import FPN as FPN
+from src.models.net import SSH as SSH
+from src import config
 
 
 class ClassHead(nn.Module):
@@ -38,13 +40,13 @@ class BboxHead(nn.Module):
 class LandmarkHead(nn.Module):
     def __init__(self, inchannels=512, num_anchors=3):
         super(LandmarkHead, self).__init__()
-        self.conv1x1 = nn.Conv2d(inchannels, num_anchors * 10, kernel_size=(1, 1), stride=1, padding=0)
+        self.conv1x1 = nn.Conv2d(inchannels, num_anchors * (config.n_landmarks * 2), kernel_size=(1, 1), stride=1, padding=0)
 
     def forward(self, x):
         out = self.conv1x1(x)
         out = out.permute(0, 2, 3, 1).contiguous()
 
-        return out.view(out.shape[0], -1, 10)
+        return out.view(out.shape[0], -1, config.n_landmarks * 2)
 
 
 class RetinaFace(nn.Module):
