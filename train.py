@@ -75,56 +75,59 @@ def train(args):
 
     priorbox = PriorBox(cfg, image_size=(img_dim, img_dim))
 
-    with torch.no_grad():
-        priors = priorbox.forward()
-        priors = priors.cuda()
+    priors = priorbox.forward()
+    priors = priors.cuda()
 
-        model.train()
-        epoch = 0 + args.start_epoch
-        print('Loading Dataset...')
+    model.train()
+    epoch = 0 + args.start_epoch
+    print('Loading Dataset...')
 
-        dataset = WFLWDatasets()
+    dataset = WFLWDatasets()
 
-        epoch_size = math.ceil(len(dataset) / batch_size)
-        max_iter = max_epoch * epoch_size
+    epoch_size = math.ceil(len(dataset) / batch_size)
+    max_iter = max_epoch * epoch_size
 
-        stepvalues = (cfg['decay1'] * epoch_size, cfg['decay2'] * epoch_size)
-        step_index = 0
+    stepvalues = (cfg['decay1'] * epoch_size, cfg['decay2'] * epoch_size)
+    step_index = 0
 
-        for epoch in range(args.start_epoch, max_epoch):
-            # batch_iterator = iter(data.DataLoader(dataset, batch_size, shuffle=True, num_workers=num_workers, collate_fn=detection_collate))
-            batch_iterator = iter(data.DataLoader(dataset, batch_size, shuffle=True, num_workers=0, collate_fn=collate_fn))
-            load_t0 = time.time()
-            if epoch in stepvalues:
-                step_index += 1
-            lr = adjust_learning_rate(initial_lr, optimizer, gamma, epoch, step_index, epoch, epoch_size)
+    for epoch in range(args.start_epoch, max_epoch):
+        # batch_iterator = iter(data.DataLoader(dataset, batch_size, shuffle=True, num_workers=num_workers, collate_fn=detection_collate))
+        batch_iterator = iter(data.DataLoader(dataset, batch_size, shuffle=True, num_workers=0, collate_fn=collate_fn))
+        load_t0 = time.time()
+        if epoch in stepvalues:
+            step_index += 1
+        lr = adjust_learning_rate(initial_lr, optimizer, gamma, epoch, step_index, epoch, epoch_size)
 
-            # load train data
-            for batch_id, (images, targets) in enumerate(tqdm(batch_iterator)):
-                images = images.cuda()
-                targets = [anno.cuda() for anno in targets]
+        # load train data
+        for batch_id, (images, targets) in enumerate(tqdm(batch_iterator)):
+            images = images.cuda()
+            targets = [anno.cuda() for anno in targets]
 
-                # forward
-                out = model(images)
+            # forward
+            out = model(images)
 
-                # backprop
-                optimizer.zero_grad()
-                loss_l, loss_c, loss_landm = criterion(out, priors, targets)
-                loss = cfg['loc_weight'] * loss_l + loss_c + loss_landm
-                loss.backward()
-                optimizer.step()
-                load_t1 = time.time()
-                batch_time = load_t1 - load_t0
-                eta = int(batch_time * (max_iter - epoch))
-                if batch_id % config.visualize_result_per_batch == 0 and batch_id > 0:
-                    visualize_model_on_validation_data(model, epoch, batch_id)
-                # print('Epoch:{}/{} || Epochiter: {}/{} || Iter: {}/{} || Loc: {:.4f} Cla: {:.4f} Landm: {:.4f} || LR: {:.8f} || Batchtime: {:.4f} s || ETA: {}'
-                #       .format(epoch, max_epoch, (iteration % epoch_size) + 1,
-                # epoch_size, iteration + 1, max_iter, loss_l.item(), loss_c.item(),
-                # loss_landm.item(), lr, batch_time,
-                # str(datetime.timedelta(seconds=eta))))
+            # backprop
+            optimizer.zero_grad()
+            loss_l, loss_c, loss_landm = criterion(out, priors, targets)
+            loss = cfg['loc_weight'] * loss_l + loss_c + loss_landm
+            loss.backward()
+            optimizer.step()
+            load_t1 = time.time()
+            batch_time = load_t1 - load_t0
+            eta = int(batch_time * (max_iter - epoch))
 
-            torch.save(model.state_dict(), save_folder + cfg['name'] + "_{}.pth".format(str(epoch).zfill(3)))
+            if batch_id % config.visualize_result_per_batch == 0 and batch_id > 0:
+                with torch.no_grad():
+                    if batch_id % config.save_per_batches == 0 and batch_id > 0:
+                        visualize_model_on_validation_data(model, epoch, batch_id)
+
+            # print('Epoch:{}/{} || Epochiter: {}/{} || Iter: {}/{} || Loc: {:.4f} Cla: {:.4f} Landm: {:.4f} || LR: {:.8f} || Batchtime: {:.4f} s || ETA: {}'
+            #       .format(epoch, max_epoch, (iteration % epoch_size) + 1,
+            # epoch_size, iteration + 1, max_iter, loss_l.item(), loss_c.item(),
+            # loss_landm.item(), lr, batch_time,
+            # str(datetime.timedelta(seconds=eta))))
+
+        torch.save(model.state_dict(), save_folder + cfg['name'] + "_{}.pth".format(str(epoch).zfill(3)))
 
 
 def adjust_learning_rate(initial_lr, optimizer, gamma, epoch, step_index, iteration, epoch_size):
