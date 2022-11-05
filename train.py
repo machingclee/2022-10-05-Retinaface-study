@@ -52,6 +52,7 @@ def train(args):
         # create new OrderedDict that does not contain `module.`
         from collections import OrderedDict
         new_state_dict = OrderedDict()
+
         for k, v in state_dict.items():
             head = k[:7]
             if head == 'module.':
@@ -59,6 +60,7 @@ def train(args):
             else:
                 name = k
             new_state_dict[name] = v
+
         model.load_state_dict(new_state_dict)
 
     if num_gpu > 1 and gpu_train:
@@ -72,6 +74,7 @@ def train(args):
     criterion = MultiBoxLoss(num_classes, 0.35, True, 0, True, 7, 0.35, False)
 
     priorbox = PriorBox(cfg, image_size=(img_dim, img_dim))
+
     with torch.no_grad():
         priors = priorbox.forward()
         priors = priors.cuda()
