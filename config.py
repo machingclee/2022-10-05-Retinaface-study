@@ -1,33 +1,18 @@
-anchor_ratios = [1]
-anchor_scales = [64, 256, 512]
-num_anchors = len(anchor_ratios) * len(anchor_scales)
-batch_size = 1
-image_shape = (1024, 1024)
-input_height, input_width = image_shape
-img_shapes = [
-    (input_height // 8, input_width // 8),
-    (input_height // 16, input_width // 16),
-    (input_height // 32, input_width // 32)
-]
-fpn_out_channels = 256
+final_nms_iou = 0.3
 rpn_n_sample = 128
-rpn_pos_ratio = 0.5
-target_pos_iou_thres = 0.7
-target_neg_iou_thres = 0.3
+WIDER_TRAIN_LABEL_TXT = r"C:\Users\user\Repos\Python\Pytorch_Retinaface\data\wider_face\wider_face_annotation\train\label.txt"
+WIDER_VAL_LABEL_TXT = r"C:\Users\user\Repos\Python\Pytorch_Retinaface\data\wider_face\wider_face_annotation\val\label.txt"
+WIDER_TRAIN_IMG_DIR = r"C:\Users\user\Repos\Python\Pytorch_Retinaface\data\wider_face\WIDER_train\images"
+WIDER_VAL_IMG_DIR = r"C:\Users\user\Repos\Python\Pytorch_Retinaface\data\wider_face\WIDER_val\images"
+WIDER_N_LANDMARKS = 5
 
-rpn_n_sample = 128
-rpn_pos_ratio = 0.5
-n_landmark_coordinates = 10
-img_dir_train = "dataset/WIDER_train/images"
-img_dir_val = "dataset/WIDER_val/images"
-bar_format = "{desc}: {percentage:.1f}%|{bar:15}| {n}/{total_fmt} [{elapsed}, {rate_fmt}{postfix}]"
+WFLW_TRAIN_LABEL_TXT = r"C:\Users\user\Repos\Python\Pytorch_Retinaface\data\WFLW\WFLW_annotations\list_98pt_rect_attr_train_test\list_98pt_rect_attr_train.txt"
+WFLW_VAL_LABEL_TXT = r"C:\Users\user\Repos\Python\Pytorch_Retinaface\data\WFLW\WFLW_annotations\list_98pt_rect_attr_train_test\list_98pt_rect_attr_test.txt"
+WFLW_TRAIN_IMG_DIR = r"C:\Users\user\Repos\Python\Pytorch_Retinaface\data\WFLW\WFLW_images"
+WFLW_VAL_IMG_DIR = r"C:\Users\user\Repos\Python\Pytorch_Retinaface\data\WFLW\WFLW_images"
+WFLW_N_LANDMARKS = 98
 
-training_annotation = "dataset/wider_face_annotation/train/label.txt"
-validation_annotation = "dataset/wider_face_annotation/val/label.txt"
-pred_score_thresh = 0.9
-
+constrain_landmarks_prediction_into_bbox = False
 model_visualization_dir = "performance_check"
-save_per_batches = 50
-
-longest_side_length = 1024
-final_nms_iou = 0.01
+visualize_result_per_batch = 100
+pred_thres = 0.4
