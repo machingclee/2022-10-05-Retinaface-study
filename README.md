@@ -30,7 +30,7 @@ I want the relative location of pupil for further study and WFLW is the one that
 
 <img src="images_for_readme/001.png"/>
 
-## When Using Landmarks of 98 Points (WFLW) with SEBlocks
+## When Using Landmarks of 196 Points (WFLW) with SEBlocks
 
 Still training in progress, different hyper-parameters are still being investigated
 
