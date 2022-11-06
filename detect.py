@@ -65,8 +65,6 @@ def detect(model, img: torch.Tensor, cfg=cfg_re50):
     tic = time.time()
     loc, scores, landms = model(img)  # forward pass
     scores = scores.squeeze(0).softmax(-1)[:, 1]
-    print('net forward time: {:.4f}'.format(time.time() - tic))
-
     priorbox = PriorBox(cfg, image_size=(im_height, im_width))
     priors = priorbox.forward()
     priors = priors.to(device)

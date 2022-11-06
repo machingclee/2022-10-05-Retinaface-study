@@ -32,7 +32,7 @@ def train(args):
     num_classes = 2
     img_dim = cfg['image_size']
     num_gpu = cfg['ngpu']
-    batch_size = cfg['batch_size']
+    batch_size = args.batch_size
     max_epoch = cfg['epoch']
     gpu_train = cfg['gpu_train']
 
@@ -79,13 +79,11 @@ def train(args):
     priors = priors.cuda()
 
     model.train()
-    epoch = 0 + args.start_epoch
     print('Loading Dataset...')
 
     dataset = WFLWDatasets()
 
     epoch_size = math.ceil(len(dataset) / batch_size)
-    max_iter = max_epoch * epoch_size
 
     stepvalues = (cfg['decay1'] * epoch_size, cfg['decay2'] * epoch_size)
     step_index = 0
@@ -114,18 +112,11 @@ def train(args):
             optimizer.step()
             load_t1 = time.time()
             batch_time = load_t1 - load_t0
-            eta = int(batch_time * (max_iter - epoch))
 
             if batch_id % config.visualize_result_per_batch == 0 and batch_id > 0:
                 with torch.no_grad():
-                    if batch_id % config.save_per_batches == 0 and batch_id > 0:
+                    if batch_id % config.visualize_result_per_batch == 0 and batch_id > 0:
                         visualize_model_on_validation_data(model, epoch, batch_id)
-
-            # print('Epoch:{}/{} || Epochiter: {}/{} || Iter: {}/{} || Loc: {:.4f} Cla: {:.4f} Landm: {:.4f} || LR: {:.8f} || Batchtime: {:.4f} s || ETA: {}'
-            #       .format(epoch, max_epoch, (iteration % epoch_size) + 1,
-            # epoch_size, iteration + 1, max_iter, loss_l.item(), loss_c.item(),
-            # loss_landm.item(), lr, batch_time,
-            # str(datetime.timedelta(seconds=eta))))
 
         torch.save(model.state_dict(), save_folder + cfg['name'] + "_{}.pth".format(str(epoch).zfill(3)))
 

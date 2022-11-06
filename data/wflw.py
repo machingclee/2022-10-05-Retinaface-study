@@ -62,10 +62,13 @@ def random_occlude(img, r=0.3, p=0.2):
 
 
 class WFLWDatasets(data.Dataset):
+    data = None
+
     def __init__(self,
                  file_list=[config.WFLW_TRAIN_LABEL_TXT, config.WFLW_VAL_LABEL_TXT],
                  img_dir=config.WFLW_TRAIN_IMG_DIR,
                  preproc=wflw_preproc(img_dim=config.input_img_size)):
+        self.file_list = file_list
         self.path = None
         self.landmarks = None
         self.attribute = None
@@ -76,39 +79,46 @@ class WFLWDatasets(data.Dataset):
         self.img_dir = img_dir
         self.data = None
 
-        img_path_to_annotations = {}
+    def get_data(self):
+        file_list = self.file_list
+        if WFLWDatasets.data is None:
+            img_path_to_annotations = {}
 
-        def get_annotation(file_list):
-            with open(file_list, 'r') as f:
+            def get_annotation(file_list):
+                # mutate img_path_to_annotations
+                with open(file_list, 'r') as f:
 
-                lines = f.readlines()
-                for line in lines:
-                    data = line.strip().split()
+                    lines = f.readlines()
+                    for line in lines:
+                        data = line.strip().split()
 
-                    rel_img_path = data[-1]
-                    landmarks = [float(v) for v in data[0: 196]]
-                    bbox = [float(v) for v in data[196:200]]
+                        rel_img_path = data[-1]
+                        landmarks = [float(v) for v in data[0: 196]]
+                        bbox = [float(v) for v in data[196:200]]
 
-                    anno = landmarks + bbox + [1]
+                        anno = landmarks + bbox + [1]
 
-                    annotation = get(img_path_to_annotations, [rel_img_path])
+                        annotation = get(img_path_to_annotations, [rel_img_path])
 
-                    if annotation is None:
-                        set_(img_path_to_annotations, [rel_img_path], [anno])
-                    else:
-                        annotation.append(anno)
+                        if annotation is None:
+                            set_(img_path_to_annotations, [rel_img_path], [anno])
+                        else:
+                            annotation.append(anno)
 
-        if isinstance(file_list, list):
-            for file in file_list:
-                get_annotation(file)
-        else:
-            get_annotation(file_list)
+            if isinstance(file_list, list):
+                for file in file_list:
+                    get_annotation(file)
+            else:
+                get_annotation(file_list)
 
-        self.data = [(rel_img_path_, annotations_) for rel_img_path_, annotations_ in img_path_to_annotations.items()]
+            WFLWDatasets.data = [(path, anno) for path, anno in img_path_to_annotations.items()]
+
+        return WFLWDatasets.data
 
     def __getitem__(self, index):
-        data = self.data[index]
-        rel_img_path, annotations = data
+        data = self.get_data()
+        curr_data = data[index]
+        rel_img_path, annotations = curr_data
         self.img = np.array(Image.open(os.path.join(self.img_dir, os.path.normpath(rel_img_path))))
         target = np.array(annotations)
 
@@ -116,7 +126,8 @@ class WFLWDatasets(data.Dataset):
         return img, target
 
     def __len__(self):
-        return len(self.data)
+        data = self.get_data()
+        return len(data)
 
 
 if __name__ == "__main__":

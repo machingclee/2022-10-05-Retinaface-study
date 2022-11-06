@@ -17,7 +17,7 @@ WFLW_VAL_IMG_DIR = r"C:\Users\user\Repos\Python\2022-10-05-Retinaface-study\data
 
 constrain_landmarks_prediction_into_bbox = False
 model_visualization_dir = "performance_check"
-visualize_result_per_batch = 100
+visualize_result_per_batch = 10
 pred_thres = 0.1
 n_landmarks = 98
 landm_dot_radius = 1

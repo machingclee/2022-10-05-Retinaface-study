@@ -44,19 +44,23 @@ def draw_dots(pil_img: Image.Image, pred_boxes, pred_landmarks: Tuple[float], r=
                     draw.ellipse((x - r, y - r, x + r, y + r), fill=(255, 0, 0))
 
 
-# def visualize_training_data(n_images: int):
-#     training_data_loader = DataLoader(dataset=FacialLandmarkTrainingDataset(),
-#                                       batch_size=1,
-#                                       shuffle=True)
-#     train_iter = iter(training_data_loader)
-#     for i in range(n_images):
-#         img, bboxes, landmarks, _ = next(train_iter)
-#         bboxes = bboxes.squeeze(0)
-#         landmarks = landmarks.squeeze(0)
-#         pil_img = torch_img_denormalization(img)
-#         draw_box(pil_img, bboxes, color=(0, 0, 255, 150))
-#         draw_dots(pil_img, bboxes, landmarks)
-#         pil_img.save("dataset_check/{}.jpg".format(str(i).zfill(3)))
+def visualize_training_data(n_images: int):
+    train_data_loader = DataLoader(dataset=WFLWDatasets(file_list=[config.WFLW_TRAIN_LABEL_TXT, config.WFLW_VAL_LABEL_TXT],
+                                                        img_dir=config.WFLW_TRAIN_IMG_DIR),
+                                   batch_size=1,
+                                   shuffle=True)
+    train_iter = iter(train_data_loader)
+    for i in range(n_images):
+        img, targets = next(iter(train_iter))
+        _, _, im_height, im_width = img.shape
+        scale_bbox = torch.Tensor([im_width, im_height] * 2).to(device)
+        scale_landm = torch.Tensor([im_width, im_height] * 98).to(device)
+        target_bboxes = targets.squeeze(0)[:, 196:-1] * scale_bbox[None]
+        target_landm = targets.squeeze(0)[:, 0:196] * scale_landm[None]
+        pil_img = torch_imgnet_denormalization_to_pil(img)
+        draw_box(pil_img, target_bboxes, color=(0, 0, 255, 150))
+        draw_dots(pil_img, target_bboxes, target_landm)
+        pil_img.save("dataset_check/{}.jpg".format(str(i).zfill(3)))
 
 
 def visualize_model_on_validation_data(model: nn.Module, epoch=0, batch_id=0):
@@ -91,5 +95,6 @@ def visualize_model_on_validation_data(model: nn.Module, epoch=0, batch_id=0):
 
 
 if __name__ == "__main__":
-    net = RetinaFace(cfg=cfg_re50, phase='test').to(device)
-    visualize_model_on_validation_data(net)
+    # net = RetinaFace(cfg=cfg_re50, phase='test').to(device)
+    # visualize_model_on_validation_data(net)
+    visualize_training_data(100)

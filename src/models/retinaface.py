@@ -10,6 +10,7 @@ from src.models.net import MobileNetV1 as MobileNetV1
 from src.models.net import FPN as FPN
 from src.models.net import SSH as SSH
 from src import config
+from src.models.se_attention import SEAttention
 
 
 class ClassHead(nn.Module):
@@ -82,6 +83,9 @@ class RetinaFace(nn.Module):
         ]
         out_channels = cfg['out_channel']
         self.fpn = FPN(in_channels_list, out_channels)
+        self.se_attn1 = SEAttention(channel=out_channels)
+        self.se_attn2 = SEAttention(channel=out_channels)
+        self.se_attn3 = SEAttention(channel=out_channels)
         self.ssh1 = SSH(out_channels, out_channels)
         self.ssh2 = SSH(out_channels, out_channels)
         self.ssh3 = SSH(out_channels, out_channels)
@@ -115,9 +119,9 @@ class RetinaFace(nn.Module):
         fpn = self.fpn(out)
 
         # SSH
-        feature1 = self.ssh1(fpn[0])
-        feature2 = self.ssh2(fpn[1])
-        feature3 = self.ssh3(fpn[2])
+        feature1 = self.se_attn1(self.ssh1(fpn[0]))
+        feature2 = self.se_attn2(self.ssh2(fpn[1]))
+        feature3 = self.se_attn3(self.ssh3(fpn[2]))
         features = [feature1, feature2, feature3]
 
         bbox_regressions = torch.cat([self.BboxHead[i](feature) for i, feature in enumerate(features)], dim=1)
