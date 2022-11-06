@@ -12,7 +12,7 @@
   - Training script has been kept minimal level of difference (almost same as before).
 - Network modification has been made before feeding features into different detection heads (`ClassHead`, `BboxHead`, `LandmarkHead`, etc).
 - Attention mechanism has been added by introducing Squeeze and Excitation Block (SEBlock) after each feature of different scales after `SSH`'s. It mainly learns which channels are relatively more important for different detection.
-- The training is done using (**W**ider **F**acial **L**andmarks in the **W**ild) WFLW dataset.
+- The training is done using **W**ider **F**acial **L**andmarks in the **W**ild (WFLW) dataset.
 
 # Dataset Check of WFLW
 
