@@ -18,6 +18,17 @@ WFLW_VAL_IMG_DIR = r"C:\Users\user\Repos\Python\2022-10-05-Retinaface-study\data
 constrain_landmarks_prediction_into_bbox = False
 model_visualization_dir = "performance_check"
 visualize_result_per_batch = 10
-pred_thres = 0.1
+pred_thres = 0.5
 n_landmarks = 98
+
+initial_lr = 1e-4
+font_path = "fonts/wt014.ttf"
+
 landm_dot_radius = 1
+landm_numbering_font_size = 6
+
+checkpoint = "weights/Resnet50_031.pth"
+start_epoch = 32
+bar_format = "{desc}: {percentage:.1f}%|{bar:15}| {n}/{total_fmt} [{elapsed}, {rate_fmt}{postfix}]"
+
+landm_loss_weight = 10

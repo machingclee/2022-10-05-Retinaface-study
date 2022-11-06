@@ -249,7 +249,7 @@ def decode_landm(pre_landm, priors, variances):
     """
     priors_wh = repeat(priors[:, None, 2:], "n_priors () w_h -> n_priors n_landm w_h", n_landm=config.n_landmarks)
     priors_cxcywh = repeat(priors[:, None, :2], "n_priors () cxcy -> n_priors n_landm cxcy", n_landm=config.n_landmarks)
-    pre_landm = rearrange(pre_landm, "n_priors (nlandm pts) -> n_priors nlandm pts", pts=2)
+    pre_landm = rearrange(pre_landm, "n_priors (nlandm xy) -> n_priors nlandm xy", xy=2)
     landms = priors_cxcywh + pre_landm * variances[0] * priors_wh
     # landms = torch.cat((priors[:, :2] + pre_landm[:, :2] * variances[0] * priors[:, 2:],
     #                     priors[:, :2] + pre_landm[:, 2:4] * variances[0] * priors[:, 2:],
@@ -257,7 +257,7 @@ def decode_landm(pre_landm, priors, variances):
     #                     priors[:, :2] + pre_landm[:, 6:8] * variances[0] * priors[:, 2:],
     #                     priors[:, :2] + pre_landm[:, 8:10] * variances[0] * priors[:, 2:],
     #                     ), dim=1)
-    return rearrange(landms, "n_priors n_landm pts -> n_priors (n_landm pts)")
+    return rearrange(landms, "n_priors n_landm xy -> n_priors (n_landm xy)")
 
 
 def log_sum_exp(x):

@@ -6,7 +6,7 @@ import numpy as np
 import os
 import src.config as config
 from torchsummary import summary
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from typing import Tuple
 from data.wider_face import WiderFaceDetection
 from data.wflw import WFLWDatasets
@@ -34,14 +34,22 @@ def draw_box(pil_img: Image.Image, bboxes, confs=None, color=(255, 255, 255, 150
 
 def draw_dots(pil_img: Image.Image, pred_boxes, pred_landmarks: Tuple[float], r=config.landm_dot_radius, constrain_pts=False):
     draw = ImageDraw.Draw(pil_img)
+    font = ImageFont.truetype(config.font_path, config.landm_numbering_font_size)
+
+    def draw_landm_num(x, y, i):
+        draw.text((x - 4, y - 10), str(i), color=color, font=font)
+
+    color = (255, 0, 0)
     for bbox, landmark in zip(pred_boxes, pred_landmarks):
         xmin, ymin, xmax, ymax = bbox
-        for x, y in np.array_split(landmark, config.n_landmarks):
+        for i, (x, y) in enumerate(np.array_split(landmark, config.n_landmarks)):
             if not constrain_pts:
-                draw.ellipse((x - r, y - r, x + r, y + r), fill=(255, 0, 0))
+                draw.ellipse((x - r, y - r, x + r, y + r), fill=color)
+                draw_landm_num(x, y, i)
             else:
                 if xmin <= x and x <= xmax and ymin <= y and y <= ymax:
                     draw.ellipse((x - r, y - r, x + r, y + r), fill=(255, 0, 0))
+                    draw_landm_num(x, y, i)
 
 
 def visualize_training_data(n_images: int):

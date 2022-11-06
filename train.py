@@ -97,7 +97,10 @@ def train(args):
         lr = adjust_learning_rate(initial_lr, optimizer, gamma, epoch, step_index, epoch, epoch_size)
 
         # load train data
-        for batch_id, (images, targets) in enumerate(tqdm(batch_iterator)):
+        for batch_id, (images, targets) in enumerate(tqdm(batch_iterator,
+                                                          desc="Epoch {}".format(epoch),
+                                                          total=len(dataset) // batch_size,
+                                                          bar_format=config.bar_format)):
             images = images.cuda()
             targets = [anno.cuda() for anno in targets]
 
@@ -107,7 +110,7 @@ def train(args):
             # backprop
             optimizer.zero_grad()
             loss_l, loss_c, loss_landm = criterion(out, priors, targets)
-            loss = cfg['loc_weight'] * loss_l + loss_c + loss_landm
+            loss = cfg['loc_weight'] * loss_l + loss_c + config.landm_loss_weight * loss_landm
             loss.backward()
             optimizer.step()
             load_t1 = time.time()
