@@ -39,7 +39,7 @@ At epoch 41:
 - green box = ground truth
 - blue box = predictions
 
-Prediction threshold has be set to 0.1 only. Higher threshold can rule out inappropriate boxes.
+Prediction threshold has been set to 0.1 only. Higher threshold can rule out inappropriate boxes.
 
 <img src="images_for_readme/epoch_041_batch_00200.jpg" width="350"/>
 <img src="images_for_readme/epoch_041_batch_00300.jpg" width="350"/>
