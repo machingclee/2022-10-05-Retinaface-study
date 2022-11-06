@@ -5,7 +5,7 @@
 # Changes
 
 - The original project only support facial landmarks of 10 points. Code modification has been made to support an arbitrary number of points, setting can be found in `src.config.n_landmarks`.
-- Some additional work has been made to part of the code that is hard-coded 5 number of times for 5 landmarks (10 poinsts) which cannot be generalized.
+- Some additional work has been made to part of the code that is hard-coded 5 times for 5 landmarks (10 poinsts) which cannot be generalized.
 - Due to structural difference of annotation file:
   - New `Dataset` object in `data/wflw.py`.
   - New `collate_fn` for `Dataloader`.
