@@ -4,8 +4,8 @@
 
 # Changes
 
-- The original project only support facial landmarks of 10 points. Code modification has been made to support an arbitrary number of points, setting can be found in `src.config.n_landmarks`.
-- Some additional work has been made to part of the code that is hard-coded 5 times for 5 landmarks (10 poinsts) which cannot be generalized.
+- The original project only supports 5 facial landmarks of 10 coordinates. Code modification has been made to support an arbitrary number of points, setting can be found in `src.config.n_landmarks`.
+- Some additional work has been made to part of the code that is hard-coded 5 times for 5 landmarks (10 coordinates) which cannot be generalized.
 - Due to structural difference of annotation file:
   - New `Dataset` object in `data/wflw.py`.
   - New `collate_fn` for `Dataloader`.
@@ -26,11 +26,11 @@ I want the relative location of pupil for further study and WFLW is the one that
 
 # Sample Result
 
-## When Using Landmarks of 10 Points (Wider Face)
+## When Using Landmarks of 5 Landmarks (Wider Face)
 
 <img src="images_for_readme/001.png"/>
 
-## When Using Landmarks of 196 Points (WFLW) with SEBlocks
+## When Using Landmarks of 98 Landmarks (WFLW) with SEBlocks
 
 Still training in progress, different hyper-parameters are still being investigated
 
