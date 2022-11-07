@@ -21,14 +21,17 @@ visualize_result_per_batch = 10
 pred_thres = 0.5
 n_landmarks = 98
 
-initial_lr = 1e-4
+
 font_path = "fonts/wt014.ttf"
 
 landm_dot_radius = 1
 landm_numbering_font_size = 6
 
-checkpoint = "weights/Resnet50_031.pth"
-start_epoch = 32
 bar_format = "{desc}: {percentage:.1f}%|{bar:15}| {n}/{total_fmt} [{elapsed}, {rate_fmt}{postfix}]"
 
-landm_loss_weight = 10
+landm_loss_weight = 1
+
+lr_initial = 1e-6
+checkpoint = "weights/Resnet50_099.pth"
+start_epoch = 100
+max_epoch = 110

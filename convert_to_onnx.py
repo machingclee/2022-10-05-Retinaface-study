@@ -67,13 +67,13 @@ if __name__ == '__main__':
     elif args.network == "resnet50":
         cfg = cfg_re50
     # net and model
-    net = RetinaFace(cfg=cfg, phase = 'test')
-    net = load_model(net, args.trained_model, args.cpu)
-    net.eval()
+    model = RetinaFace(cfg=cfg, phase = 'test')
+    model = load_model(model, args.trained_model, args.cpu)
+    model.eval()
     print('Finished loading model!')
-    print(net)
+    print(model)
     device = torch.device("cpu" if args.cpu else "cuda")
-    net = net.to(device)
+    model = model.to(device)
 
     # ------------------------ export -----------------------------
     output_onnx = 'FaceDetector.onnx'
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     output_names = ["output0"]
     inputs = torch.randn(1, 3, args.long_side, args.long_side).to(device)
 
-    torch_out = torch.onnx._export(net, inputs, output_onnx, export_params=True, verbose=False,
+    torch_out = torch.onnx._export(model, inputs, output_onnx, export_params=True, verbose=False,
                                    input_names=input_names, output_names=output_names)
 
 

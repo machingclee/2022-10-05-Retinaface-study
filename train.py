@@ -88,7 +88,7 @@ def train(args):
     stepvalues = (cfg['decay1'] * epoch_size, cfg['decay2'] * epoch_size)
     step_index = 0
 
-    for epoch in range(args.start_epoch, max_epoch):
+    for epoch in range(config.start_epoch, config.max_epoch + 1):
         # batch_iterator = iter(data.DataLoader(dataset, batch_size, shuffle=True, num_workers=num_workers, collate_fn=detection_collate))
         batch_iterator = iter(data.DataLoader(dataset, batch_size, shuffle=True, num_workers=0, collate_fn=collate_fn))
         load_t0 = time.time()
