@@ -26,11 +26,11 @@ I want the relative location of pupil for further study and WFLW is the one that
 
 # Sample Result
 
-## When Using Landmarks of 5 Landmarks (Wider Face)
+## When Using Data of 5 Landmarks (Wider Face)
 
 <img src="images_for_readme/001.png"/>
 
-## When Using Landmarks of 98 Landmarks (WFLW) with SEBlocks
+## When Using Data of 98 Landmarks (WFLW) with SEBlocks
 
 Still training in progress, different hyper-parameters are still being investigated
 
