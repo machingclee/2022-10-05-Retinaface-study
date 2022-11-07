@@ -43,5 +43,5 @@ Prediction threshold has been set to 0.1 only. Higher threshold can rule out ina
 <img src="images_for_readme/epoch_041_batch_00300.jpg" width="350"/>
 <img src="images_for_readme/epoch_041_batch_00380.jpg" width="350"/>
 <img src="images_for_readme/epoch_041_batch_00130.jpg" width="350"/>
-<img src="performance_check/epoch_060_batch_00740.jpg" width="350"/>
-<img src="performance_check/epoch_061_batch_00330.jpg" width="350"/>
+<img src="images_for_readme/epoch_060_batch_00740.jpg" width="350"/>
+<img src="images_for_readme/epoch_061_batch_00330.jpg" width="350"/>
