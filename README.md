@@ -22,7 +22,7 @@ Each of the ground truths in WFLW look:
 
 # Why WFLW Dataset?
 
-I want the relative location of pupil for further study and WFLW is the one that also annotate pupil.
+I want the relative location of pupil for further study and WFLW is the one that also annotates pupil.
 
 # Sample Result
 
