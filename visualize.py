@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 import os
 import src.config as config
+from torchvision.ops import nms
 from torchsummary import summary
 from PIL import Image, ImageDraw, ImageFont
 from typing import Tuple
@@ -16,15 +17,18 @@ from detect import detect, load_model
 from data import cfg_mnet, cfg_re50
 from src.models.retinaface import RetinaFace
 from data.data_augment import torch_imgnet_denormalization_to_pil
+from layers.functions.prior_box import PriorBox
+from utils.box_utils import decode, decode_landm
+from src.regression_parser import RegressionParser
 
 
-def draw_box(pil_img: Image.Image, bboxes, confs=None, color=(255, 255, 255, 150)):
+def draw_box(pil_img: Image.Image, bboxes, scores=None, color=(255, 255, 255, 150)):
     draw = ImageDraw.Draw(pil_img)
     for i, bbox in enumerate(bboxes):
         xmin, ymin, xmax, ymax = bbox
         draw.rectangle(((xmin, ymin), (xmax, ymax)), outline=color, width=2)
-        if confs is not None:
-            conf = confs[i]
+        if scores is not None:
+            conf = scores[i]
             draw.text(
                 (xmin, max(ymin - 10, 4)),
                 "{:.2f}".format(conf.item()),
@@ -71,7 +75,22 @@ def visualize_training_data(n_images: int):
         pil_img.save("dataset_check/{}.jpg".format(str(i).zfill(3)))
 
 
-def visualize_model_on_validation_data(model: nn.Module, epoch=0, batch_id=0):
+def decode_retina_output(bbox_regressions, scores, ldm_regressions, im_width, im_height, priorbox, score_threshold):
+    scale = torch.Tensor([im_width, im_height, im_width, im_height]).to(device)
+    scale_landm = torch.Tensor([im_width, im_height] * config.n_landmarks).to(device)
+    boxes = decode(bbox_regressions.squeeze(0), priorbox, cfg_re50['variance'])
+    boxes = boxes * scale[None]
+    landms = decode_landm(ldm_regressions.squeeze(0), priorbox, cfg_re50['variance']) * scale_landm[None]
+    keep_ = nms(boxes, scores, config.final_nms_iou)[0: config.rpn_n_sample]
+    keep = keep_[torch.where(scores[keep_] > score_threshold)[0]]
+
+    boxes = boxes[keep]
+    scores = scores[keep]
+    landms = landms[keep]
+    return boxes, scores, landms
+
+
+def visualize_model_on_validation_data(model: nn.Module, epoch=0, batch_id=0, prefix=None):
     model.eval()
     # val_data_loader = DataLoader(dataset=WiderFaceDetection(config.WIDER_VAL_LABEL_TXT, config.WIDER_VAL_IMG_DIR, mode="val"),
     #                              batch_size=1,
@@ -83,19 +102,25 @@ def visualize_model_on_validation_data(model: nn.Module, epoch=0, batch_id=0):
     img, targets = next(iter(val_data_loader))
     _, _, im_height, im_width = img.shape
     scale = torch.Tensor([im_width, im_height] * 2).to(device)
+
     pred_img = img.clone()
-    target_bboxes = targets.squeeze(0)[:, 196:-1] * scale[None]
-    confs, pred_boxes, pred_landmarks = detect(model, pred_img)
     pil_img = torch_imgnet_denormalization_to_pil(img)
 
-    draw_box(pil_img, pred_boxes, color=(0, 0, 255, 150), confs=confs)
+    target_bboxes = targets.squeeze(0)[:, 196:-1] * scale[None]
+    bbox_regressions, scores, ldm_regressions = model(pred_img)
+    regression_parser = RegressionParser(image_size=[im_height, im_width])
+    pred_boxes, scores, pred_landmarks = regression_parser(bbox_regressions, scores, ldm_regressions)
+
+    draw_box(pil_img, pred_boxes, color=(0, 0, 255, 150), scores=scores)
     draw_box(pil_img, target_bboxes, color=(0, 255, 0, 150))
     draw_dots(pil_img, pred_boxes, pred_landmarks, constrain_pts=config.constrain_landmarks_prediction_into_bbox)
 
-    save_img_path = os.path.join(config.model_visualization_dir, "epoch_{}_batch_{}.jpg".format(
+    save_img_path = os.path.join(config.model_visualization_dir, "{}epoch_{}_batch_{}.jpg".format(
+        prefix if prefix is not None else "",
         str(epoch).zfill(3),
         str(batch_id).zfill(5)
     ))
+
     save_img_path_latest = os.path.join(config.model_visualization_dir, "latest.jpg")
     pil_img.save(save_img_path)
     pil_img.save(save_img_path_latest)
@@ -103,6 +128,7 @@ def visualize_model_on_validation_data(model: nn.Module, epoch=0, batch_id=0):
 
 
 if __name__ == "__main__":
-    # net = RetinaFace(cfg=cfg_re50, phase='test').to(device)
-    # visualize_model_on_validation_data(net)
-    visualize_training_data(100)
+    model = RetinaFace(cfg=cfg_re50).to(device)
+    state_dict = torch.load("weights/Resnet50_076.pth")
+    model.load_state_dict(state_dict, strict=False)
+    visualize_model_on_validation_data(model)

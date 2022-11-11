@@ -32,8 +32,7 @@ def train(args):
     num_classes = 2
     img_dim = cfg['image_size']
     num_gpu = cfg['ngpu']
-    batch_size = args.batch_size
-    max_epoch = cfg['epoch']
+    batch_size = config.batch_size
     gpu_train = cfg['gpu_train']
 
     momentum = args.momentum
@@ -119,7 +118,7 @@ def train(args):
             if batch_id % config.visualize_result_per_batch == 0 and batch_id > 0:
                 with torch.no_grad():
                     if batch_id % config.visualize_result_per_batch == 0 and batch_id > 0:
-                        visualize_model_on_validation_data(model, epoch, batch_id)
+                        visualize_model_on_validation_data(model, epoch, batch_id, prefix="mobilenet025_")
 
         torch.save(model.state_dict(), save_folder + cfg['name'] + "_{}.pth".format(str(epoch).zfill(3)))
 

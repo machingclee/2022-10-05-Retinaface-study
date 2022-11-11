@@ -18,6 +18,7 @@ from torchvision.ops import nms
 from src.device import device
 from data import cfg_mnet, cfg_re50
 from arg_parser import get_args
+from src.regression_parser import RegressionParser
 
 
 def check_keys(model, pretrained_state_dict):
@@ -63,22 +64,10 @@ def detect(model, img: torch.Tensor, cfg=cfg_re50):
     img = img.to(device)
     scale = scale.to(device)
     tic = time.time()
-    loc, scores, landms = model(img)  # forward pass
-    scores = scores.squeeze(0).softmax(-1)[:, 1]
-    priorbox = PriorBox(cfg, image_size=(im_height, im_width))
-    priors = priorbox.forward()
-    priors = priors.to(device)
-    boxes = decode(loc.data.squeeze(0), priors, cfg['variance'])
-    boxes = boxes * scale
-    landms = decode_landm(landms.data.squeeze(0), priors, cfg['variance'])
-    scale_landm = torch.Tensor([im_width, im_height] * config.n_landmarks).to(device)
-    landms = landms * scale_landm[None]
-    keep_ = nms(boxes, scores, config.final_nms_iou)[0: config.rpn_n_sample]
-    keep = keep_[torch.where(scores[keep_] > config.pred_thres)[0]]
-    boxes = boxes[keep]
-    scores = scores[keep]
-    landms = landms[keep]
-    return scores, boxes, landms
+    bboxes, scores, landms = model(img)  # forward pass
+    regression_parser = RegressionParser(image_size=(im_height, im_width))
+    boxes, scores, landms = regression_parser(bboxes, scores, landms)
+    return boxes, scores, landms
 
 
 if __name__ == '__main__':

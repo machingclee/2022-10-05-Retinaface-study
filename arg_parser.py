@@ -7,10 +7,9 @@ import os
 def get_args_parser():
     parser = argparse.ArgumentParser('Retinaface Training', add_help=False)
     parser.add_argument('--training_dataset', default=config.WIDER_TRAIN_LABEL_TXT, help='Training dataset directory')
-    parser.add_argument('--network', default='resnet50', help='Backbone network mobile0.25 or resnet50')
+    parser.add_argument('--network', default='mobile0.25', help='Backbone network mobile0.25 or resnet50')
     parser.add_argument('--lr', '--learning-rate', default=config.lr_initial, type=float, help='initial learning rate')
     parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-    parser.add_argument('--batch_size', default=8, type=int, help="number of images per batch")
     parser.add_argument('--checkpoint', default=config.checkpoint, help='resume net for retraining')
     parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight decay for SGD')
     parser.add_argument('--gamma', default=0.1, type=float, help='Gamma update for SGD')

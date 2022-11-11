@@ -1,7 +1,9 @@
 final_nms_iou = 0.3
 rpn_n_sample = 128
-
-input_img_size = 840
+# input_img_size = 840
+input_img_size = 640
+# n_priors = 29126
+n_priors = 16800
 
 WIDER_TRAIN_LABEL_TXT = r"C:\Users\user\Repos\Python\2022-10-05-Retinaface-study\data\wider_face\wider_face_annotation\train\label.txt"
 WIDER_VAL_LABEL_TXT = r"C:\Users\user\Repos\Python\2022-10-05-Retinaface-study\data\wider_face\wider_face_annotation\val\label.txt"
@@ -32,6 +34,12 @@ bar_format = "{desc}: {percentage:.1f}%|{bar:15}| {n}/{total_fmt} [{elapsed}, {r
 landm_loss_weight = 1
 
 lr_initial = 1e-6
-checkpoint = "weights/Resnet50_099.pth"
-start_epoch = 100
-max_epoch = 110
+checkpoint = "weights/mobilenet0.25_049.pth"
+start_epoch = 50
+max_epoch = 100
+batch_size = 8
+
+onnx_ongoing = True
+
+cam_width = 640
+cam_height = 480

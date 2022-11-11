@@ -8,7 +8,7 @@
          "program": "${file}",
          "console": "integratedTerminal",
          "env": { "PYTHONPATH": "${workspaceRoot}"},
-         "args": ["--checkpoint", "weights/Resnet50_012.pth", "--start_epoch", "13"]
+        "justMyCode": false
       }
   ]
 }

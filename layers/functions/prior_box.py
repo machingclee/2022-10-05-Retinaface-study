@@ -24,10 +24,10 @@ class PriorBox(object):
                     s_ky = min_size / self.image_size[0]
                     cx = (j + 0.5) * self.steps[k] / self.image_size[1]
                     cy = (i + 0.5) * self.steps[k] / self.image_size[0]
-                    anchors += [cx, cy, s_kx, s_ky]
+                    anchors.append([cx, cy, s_kx, s_ky])
 
         # back to torch land
-        output = torch.Tensor(anchors).view(-1, 4)
+        output = torch.Tensor(anchors)
         if self.clip:
             output.clamp_(max=1, min=0)
         return output

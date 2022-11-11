@@ -11,16 +11,11 @@ import cv2
 from src.models.retinaface import RetinaFace
 from utils.box_utils import decode, decode_landm
 from utils.timer import Timer
-
-
-parser = argparse.ArgumentParser(description='Test')
-parser.add_argument('-m', '--trained_model', default='./weights/mobilenet0.25_Final.pth',
-                    type=str, help='Trained state_dict file path to open')
-parser.add_argument('--network', default='mobile0.25', help='Backbone network mobile0.25 or resnet50')
-parser.add_argument('--long_side', default=640, help='when origin_size is false, long_side is scaled size(320 or 640 for long side)')
-parser.add_argument('--cpu', action="store_true", default=True, help='Use cpu inference')
-
-args = parser.parse_args()
+from src.regression_parser import RegressionParser, SimplifiedRegressionParser
+from repo.pytorch2keras.pytorch2keras.pytorch2keras import pytorch_to_keras
+from src import config
+from onnx import load
+from onnx2keras import onnx_to_keras
 
 
 def check_keys(model, pretrained_state_dict):
@@ -39,7 +34,7 @@ def check_keys(model, pretrained_state_dict):
 def remove_prefix(state_dict, prefix):
     ''' Old style model is stored with all names of parameters sharing common prefix 'module.' '''
     print('remove prefix \'{}\''.format(prefix))
-    f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
+    def f(x): return x.split(prefix, 1)[-1] if x.startswith(prefix) else x
     return {f(key): value for key, value in state_dict.items()}
 
 
@@ -60,29 +55,70 @@ def load_model(model, pretrained_path, load_to_cpu):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Test')
+    parser.add_argument('-m', '--checkpoint', default='weights/mobilenet0.25_044.pth',
+                        type=str, help='Trained state_dict file path to open')
+    parser.add_argument('--network', default='mobile0.25', help='Backbone network mobile0.25 or resnet50')
+    parser.add_argument('--long_side', default=840, help='when origin_size is false, long_side is scaled size(320 or 640 for long side)')
+    parser.add_argument('--cpu', action="store_true", default=True, help='Use cpu inference')
+
+    args = parser.parse_args()
+
     torch.set_grad_enabled(False)
     cfg = None
     if args.network == "mobile0.25":
         cfg = cfg_mnet
     elif args.network == "resnet50":
         cfg = cfg_re50
+
     # net and model
-    model = RetinaFace(cfg=cfg, phase = 'test')
-    model = load_model(model, args.trained_model, args.cpu)
-    model.eval()
-    print('Finished loading model!')
-    print(model)
+    retina_face = RetinaFace(cfg=cfg)
+    retina_face = load_model(retina_face, args.checkpoint, args.cpu)
+    retina_face.eval()
+
+    regression_parser = SimplifiedRegressionParser()
+    regression_parser.eval()
+
     device = torch.device("cpu" if args.cpu else "cuda")
-    model = model.to(device)
+    retina_face = retina_face.to(device)
 
     # ------------------------ export -----------------------------
-    output_onnx = 'FaceDetector.onnx'
-    print("==> Exporting model to ONNX format at '{}'".format(output_onnx))
-    input_names = ["input0"]
-    output_names = ["output0"]
-    inputs = torch.randn(1, 3, args.long_side, args.long_side).to(device)
+    dummy_inputs_retina_face = torch.randn(
+        1, 3, config.input_img_size, config.input_img_size
+    )
+    dummy_inputs_regression_parser = (
+        torch.randn(1, config.n_priors, 4),
+        torch.randn(1, config.n_priors),
+        torch.randn(1, config.n_priors, 196)
+    )
 
-    torch_out = torch.onnx._export(model, inputs, output_onnx, export_params=True, verbose=False,
-                                   input_names=input_names, output_names=output_names)
+    # x = torch.randn(1, 3, 224, 224, requires_grad=False)
+    # k_model = pytorch_to_keras(net, x, [(3, None, None,)], verbose=True, names='short')
+    # k_model.save('keras.h5')
 
+    # k_model = pytorch_to_keras(retina_face,
+    #                            dummy_inputs_retina_face,
+    #                            [(3, config.input_img_size, config.input_img_size)],
+    #                            name_policy='renumerate',
+    #                            verbose=True)
+    # k_model.save("RetinaFace.h5")
 
+    # torch.onnx.export(
+    #     retina_face,
+    #     dummy_inputs_retina_face,
+    #     'FaceDetector.onnx',
+    #     export_params=True,
+    #     verbose=False,
+    #     input_names=["inputImage"],
+    #     output_names=["bbox_regressions", "scores", "ldm_regressions"],
+    #     opset_version=11)
+
+    torch.onnx.export(
+        regression_parser,
+        args=dummy_inputs_regression_parser,
+        f='RegressionParser.onnx',
+        export_params=True,
+        verbose=False,
+        input_names=["bbox_regressions", "scores", "landm_regressions"],
+        output_names=["boxes", "scores", "landms"],
+        opset_version=11)
